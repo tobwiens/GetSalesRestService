@@ -1,9 +1,8 @@
 package sale
 import (
 	"net/http"
-	"fmt"
-	"github.com/spf13/viper"
 	"backendless"
+	"converter"
 )
 
 const (
@@ -16,31 +15,24 @@ type ServeSalesRestService struct {
 
 func (salesRestService ServeSalesRestService) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	// Execute doHTTPRequest method and handle errors if error != nil
-	if statusValue, errorValue := salesRestService.doHTTPRequest(responseWriter, request); errorValue != nil {
-		// Handle errors
-		switch statusValue {
-		case http.StatusNotFound:
-			fmt.Fprintln(responseWriter, "Not found")
-		}
+	if  errorValue := salesRestService.doHTTPRequest(responseWriter, request); errorValue != nil {
+		responseWriter.Write([]byte(errorValue.Error()))
 	}
 }
 
-func (salesRestService ServeSalesRestService) doHTTPRequest(responseWriter http.ResponseWriter, request *http.Request) (status int, returnError error) {
-
-	fmt.Fprintln(responseWriter, viper.Get("message"))
-	status = http.StatusOK
+func (salesRestService ServeSalesRestService) doHTTPRequest(responseWriter http.ResponseWriter, request *http.Request) ( returnError error) {
+	// Get query parameters from URL
 	fromDate := request.URL.Query().Get(FromDateKey)
 	toDate := request.URL.Query().Get(ToDateKey)
 	asin := request.URL.Query().Get(AsinKey)
-	fmt.Fprintln(responseWriter, "fromDate: "+fromDate)
-	fmt.Fprintln(responseWriter, "toDate: "+toDate)
-	fmt.Fprintln(responseWriter, "ASIN: "+asin)
-
-	jsonResponse, returnError := backendless.BackendlessSearchAsinFromDateToDate(fromDate, toDate, asin)
+	// Query backendless API for data from, to for a given ASIN -- Return with error if error occurs
+	backendlessResponse, returnError := backendless.BackendlessSearchAsinFromDateToDate(fromDate, toDate, asin)
 	if (returnError != nil) {
-		fmt.Println(returnError)
+		return
 	}
-	fmt.Println(jsonResponse)
-
+	// Convert received json into
+	convertedJson, returnError := converter.ConvertJsonBackendlessToWebsiteFormat(backendlessResponse)
+	// Write json as a response
+	responseWriter.Write([]byte(convertedJson))
 	return
 }
